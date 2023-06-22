@@ -1,67 +1,95 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.Device;
+﻿using UnityEngine;
 
 public class Portal : MonoBehaviour
 {
-    // Start is called before the first frame update
+    public Portal targetPortal;
+    
+    public Transform normalVisible;
+    public Transform normalInvisible;
 
-    public Portal linkedPortal;
+    public Camera portalCamera;
+    public Renderer viewthroughRenderer;
+    private RenderTexture viewthroughRenderTexture;
+    private Material viewthroughMaterial;
 
-    public MeshRenderer thisRenderer;
-    public Camera thisCamera;
+    private Camera mainCamera;
 
-    public Camera playerCamera;
+    private Vector4 vectorPlane;
 
-
-    private RenderTexture viewTexture;
-    void Start()
+    public static Vector3 TransformPositionBetweenPortals(Portal sender, Portal target, Vector3 position)
     {
-        playerCamera = Camera.main;
-        
-
-        SetupTexture();
+        return
+            target.normalInvisible.TransformPoint(
+                sender.normalVisible.InverseTransformPoint(position));
     }
 
-    void SetupTexture()
+    public static Quaternion TransformRotationBetweenPortals(Portal sender, Portal target, Quaternion rotation)
     {
-        if (viewTexture == null || viewTexture.width != UnityEngine.Screen.width || viewTexture.height != UnityEngine.Screen.height)
-        {
-            if (viewTexture != null)
-            {
-                viewTexture.Release();
-            }
-            viewTexture = new RenderTexture(UnityEngine.Screen.width, UnityEngine.Screen.height, 0);
-            // Render the view from the portal camera to the view texture
-            thisCamera.targetTexture = viewTexture;
-            // Display the view texture on the screen of the linked portal
-            thisRenderer.material.SetTexture("_MainTex", viewTexture);
-        }
-        
+        return
+            target.normalInvisible.rotation *
+            Quaternion.Inverse(sender.normalVisible.rotation) *
+            rotation;
     }
 
-    void MoveCamera()
+    private void Start()
     {
+        // Create render texture
+        
+        viewthroughRenderTexture = new RenderTexture(Screen.width, Screen.height, 24, RenderTextureFormat.DefaultHDR);
+        viewthroughRenderTexture.Create();
+        
+        // Assign render texture to portal material (cloned)
+        
+        viewthroughMaterial = viewthroughRenderer.material;
+        viewthroughMaterial.mainTexture = viewthroughRenderTexture;
+        
+        // Assign render texture to portal camera
+        
+        portalCamera.targetTexture = viewthroughRenderTexture;
+        
+        // Cache the main camera
+        
+        mainCamera = Camera.main;
+        
+        // Generate bounding plane
 
-        thisCamera.transform.position = this.transform.position + linkedPortal.transform.position - playerCamera.transform.position;
-        thisCamera.transform.forward = (this.transform.position - playerCamera.transform.position).normalized * -1f;
-        thisCamera.Render();
+        var plane = new Plane(normalVisible.forward, transform.position);
+        vectorPlane = new Vector4(plane.normal.x, plane.normal.y, plane.normal.z, plane.distance);
     }
 
-    // Update is called once per frame
-    void Update()
+    private void LateUpdate()
     {
+        // Calculate portal camera position and rotation
+
+        var virtualPosition = TransformPositionBetweenPortals(this, targetPortal, mainCamera.transform.position);
+        var virtualRotation = TransformRotationBetweenPortals(this, targetPortal, mainCamera.transform.rotation);
         
-        SetupTexture();
-        linkedPortal.thisRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
-        linkedPortal.thisRenderer.material.SetInt("displayMask", 0);
-        thisRenderer.material.SetInt("displayMask", 0);
-        thisRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
-        MoveCamera();
-        linkedPortal.thisRenderer.material.SetInt("displayMask", 1);
-        linkedPortal.thisRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
-        thisRenderer.material.SetInt("displayMask", 0);
-        thisRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+        // Position camera
+        
+        portalCamera.transform.SetPositionAndRotation(virtualPosition, virtualRotation);
+        
+        // Calculate projection matrix
+        
+        var clipThroughSpace =
+            Matrix4x4.Transpose(Matrix4x4.Inverse(portalCamera.worldToCameraMatrix))
+            * targetPortal.vectorPlane;
+        
+        // Set portal camera projection matrix to clip walls between target portal and portal camera
+        // Inherits main camera near/far clip plane and FOV settings
+        
+        var obliqueProjectionMatrix = mainCamera.CalculateObliqueMatrix(clipThroughSpace);
+        portalCamera.projectionMatrix = obliqueProjectionMatrix;
+    }
+
+    private void OnDestroy()
+    {
+        // Release render texture from GPU
+        
+        viewthroughRenderTexture.Release();
+   
+        // Destroy cloned material and render texture
+        
+        Destroy(viewthroughMaterial);
+        Destroy(viewthroughRenderTexture);
     }
 }
