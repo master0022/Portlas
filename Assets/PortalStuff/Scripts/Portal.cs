@@ -1,3 +1,6 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class Portal : MonoBehaviour
@@ -15,6 +18,9 @@ public class Portal : MonoBehaviour
     private Camera mainCamera;
 
     private Vector4 vectorPlane;
+
+    private HashSet<PortalableObject> objectsInPortal = new HashSet<PortalableObject>();
+    private HashSet<PortalableObject> objectsInPortalToRemove = new HashSet<PortalableObject>();
 
     public static Vector3 TransformPositionBetweenPortals(Portal sender, Portal target, Vector3 position)
     {
@@ -53,8 +59,75 @@ public class Portal : MonoBehaviour
 
         // Generate bounding plane
 
-        var plane = new Plane(normalVisible.forward, transform.position);
+        var plane = new Plane(normalVisible.forward, transform.position + normalInvisible.forward * 0.01f);
         vectorPlane = new Vector4(plane.normal.x, plane.normal.y, plane.normal.z, plane.distance);
+
+        StartCoroutine(WaitForFixedUpdateLoop());
+    }
+
+    private IEnumerator WaitForFixedUpdateLoop()
+    {
+        var waitForFixedUpdate = new WaitForFixedUpdate();
+        while (true)
+        {
+            yield return waitForFixedUpdate;
+            try
+            {
+                CheckForPortalCrossing();
+            }
+            catch (Exception e)
+            {
+                // Catch exceptions so our loop doesn't die whenever there is an error
+                Debug.LogException(e);
+            }
+        }
+    }
+
+    private void CheckForPortalCrossing()
+    {
+        // Clear removal queue
+
+        objectsInPortalToRemove.Clear();
+
+        // Check every touching object
+
+        foreach (var portalableObject in objectsInPortal)
+        {
+            // If portalable object has been destroyed, remove it immediately
+
+            if (portalableObject == null)
+            {
+                objectsInPortalToRemove.Add(portalableObject);
+                continue;
+            }
+
+            // Check if portalable object is behind the portal using Vector3.Dot (dot product)
+            // If so, they have crossed through the portal.
+
+            var pivot = portalableObject.transform;
+            var directionToPivotFromTransform = pivot.position - transform.position;
+            directionToPivotFromTransform.Normalize();
+            var pivotToNormalDotProduct = Vector3.Dot(directionToPivotFromTransform, normalVisible.forward);
+            if (pivotToNormalDotProduct > 0) continue;
+
+            // Warp object
+
+            var newPosition = TransformPositionBetweenPortals(this, targetPortal, portalableObject.transform.position);
+            var newRotation = TransformRotationBetweenPortals(this, targetPortal, portalableObject.transform.rotation);
+            portalableObject.transform.SetPositionAndRotation(newPosition, newRotation);
+            portalableObject.OnHasTeleported(this, targetPortal, newPosition, newRotation);
+
+            // Object is no longer touching this side of the portal
+
+            objectsInPortalToRemove.Add(portalableObject);
+        }
+
+        // Remove all objects queued up for removal
+
+        foreach (var portalableObject in objectsInPortalToRemove)
+        {
+            objectsInPortal.Remove(portalableObject);
+        }
     }
 
     private void LateUpdate()
@@ -79,10 +152,24 @@ public class Portal : MonoBehaviour
 
         var obliqueProjectionMatrix = mainCamera.CalculateObliqueMatrix(clipThroughSpace);
         portalCamera.projectionMatrix = obliqueProjectionMatrix;
+    }
 
-        // Render camera
+    private void OnTriggerEnter(Collider other)
+    {
+        var portalableObject = other.GetComponent<PortalableObject>();
+        if (portalableObject)
+        {
+            objectsInPortal.Add(portalableObject);
+        }
+    }
 
-        portalCamera.Render();
+    private void OnTriggerExit(Collider other)
+    {
+        var portalableObject = other.GetComponent<PortalableObject>();
+        if (portalableObject)
+        {
+            objectsInPortal.Remove(portalableObject);
+        }
     }
 
     private void OnDestroy()

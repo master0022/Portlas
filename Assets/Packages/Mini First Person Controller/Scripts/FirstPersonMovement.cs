@@ -11,6 +11,7 @@ public class FirstPersonMovement : MonoBehaviour
     public float runSpeed = 9;
     public KeyCode runningKey = KeyCode.LeftShift;
 
+    private PortalableObject portalableObject;
     Rigidbody rigidbody;
     /// <summary> Functions to override movement speed. Will use the last added override. </summary>
     public List<System.Func<float>> speedOverrides = new List<System.Func<float>>();
@@ -21,6 +22,15 @@ public class FirstPersonMovement : MonoBehaviour
     {
         // Get the rigidbody on this.
         rigidbody = GetComponent<Rigidbody>();
+        portalableObject = GetComponent<PortalableObject>();
+        portalableObject.HasTeleported += PortalableObjectOnHasTeleported;
+    }
+
+    private void PortalableObjectOnHasTeleported(Portal sender, Portal destination, Vector3 newposition, Quaternion newrotation)
+    {
+        // For character controller to update
+
+        Physics.SyncTransforms();
     }
 
     void FixedUpdate()
@@ -40,5 +50,10 @@ public class FirstPersonMovement : MonoBehaviour
 
         // Apply movement.
         rigidbody.velocity = transform.rotation * new Vector3(targetVelocity.x, rigidbody.velocity.y, targetVelocity.y);
+    }
+
+    private void OnDestroy()
+    {
+        portalableObject.HasTeleported -= PortalableObjectOnHasTeleported;
     }
 }

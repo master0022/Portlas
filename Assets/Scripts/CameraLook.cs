@@ -1,6 +1,6 @@
-﻿using UnityEngine;
+using UnityEngine;
 
-public class FirstPersonLook : MonoBehaviour
+public class CameraLook : MonoBehaviour
 {
     [SerializeField]
     Transform character;
@@ -14,7 +14,7 @@ public class FirstPersonLook : MonoBehaviour
     void Reset()
     {
         // Get the character from the FirstPersonMovement in parents.
-        character = GetComponentInParent<FirstPersonMovement>().transform;
+        character = GetComponentInParent<PlayerController>().transform;
     }
 
     void Start()
@@ -23,7 +23,7 @@ public class FirstPersonLook : MonoBehaviour
         Cursor.lockState = CursorLockMode.Locked;
     }
 
-    void FixedUpdate()
+    void Update()
     {
         // Get smooth velocity.
         Vector2 mouseDelta = new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y"));
