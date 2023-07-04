@@ -114,6 +114,8 @@ public class Portal : MonoBehaviour
 
             var newPosition = TransformPositionBetweenPortals(this, targetPortal, portalableObject.transform.position);
             var newRotation = TransformRotationBetweenPortals(this, targetPortal, portalableObject.transform.rotation);
+            UnityEngine.Debug.Log(newPosition);
+            UnityEngine.Debug.Log(targetPortal.transform.position);
             portalableObject.transform.SetPositionAndRotation(newPosition, newRotation);
             portalableObject.OnHasTeleported(this, targetPortal, newPosition, newRotation);
 

@@ -105,7 +105,7 @@ public class PortalWindow : MonoBehaviour
 
             // Check if portalable object is behind the portal using Vector3.Dot (dot product)
             // If so, they have crossed through the portal.
-            UnityEngine.Debug.Log(targetPortal.name);
+            
             var pivot = portalableObject.transform;
             var directionToPivotFromTransform = pivot.position - transform.position;
             directionToPivotFromTransform.Normalize();
@@ -115,14 +115,32 @@ public class PortalWindow : MonoBehaviour
 
             // Warp object
 
-            var newPosition = TransformPositionBetweenPortals(this, targetPortal, portalableObject.transform.position);
-            newPosition = targetPortal.transform.position + newPosition;
+
+            //var newPosition = TransformPositionBetweenPortals(this, targetPortal, portalableObject.transform.position);
+            var newPosition = targetPortal.normalInvisible.TransformPoint(this.normalVisible.InverseTransformPoint(portalableObject.transform.position));
+            //newPosition = targetPortal.transform.position + newPosition;
+
+            UnityEngine.Debug.Log("posicao objeto");
+            UnityEngine.Debug.Log(portalableObject.transform.position);
+            UnityEngine.Debug.Log("posicao relativa");
+            UnityEngine.Debug.Log(this.normalVisible.InverseTransformPoint(portalableObject.transform.position));
+            UnityEngine.Debug.Log(targetPortal.name);
             UnityEngine.Debug.Log(newPosition);
+            UnityEngine.Debug.Log("posicao portal outro");
             UnityEngine.Debug.Log(targetPortal.transform.position);
+
+            UnityEngine.Debug.Log("posicao final");
+            UnityEngine.Debug.Log(newPosition);
             var newRotation = TransformRotationBetweenPortals(this, targetPortal, portalableObject.transform.rotation);
+            var cc = portalableObject.GetComponent<CharacterController>();
+            cc.enabled = false;
             portalableObject.transform.SetPositionAndRotation(newPosition, newRotation);
+            cc.enabled = true;
             portalableObject.OnHasTeleported(this, targetPortal, newPosition, newRotation);
 
+
+            UnityEngine.Debug.Log("objeto");
+            UnityEngine.Debug.Log(portalableObject.name);
             // Object is no longer touching this side of the portal
 
             objectsInPortalToRemove.Add(portalableObject);
