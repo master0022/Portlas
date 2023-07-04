@@ -1,11 +1,13 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using UnityEngine;
 
-public class Portal : MonoBehaviour
+public class PortalWindow : MonoBehaviour
 {
-    public Portal targetPortal;
+    public PortalWindow targetPortal;
 
     public Transform normalVisible;
     public Transform normalInvisible;
@@ -22,14 +24,14 @@ public class Portal : MonoBehaviour
     private HashSet<PortalableObject> objectsInPortal = new HashSet<PortalableObject>();
     private HashSet<PortalableObject> objectsInPortalToRemove = new HashSet<PortalableObject>();
 
-    public static Vector3 TransformPositionBetweenPortals(Portal sender, Portal target, Vector3 position)
+    public static Vector3 TransformPositionBetweenPortals(PortalWindow sender, PortalWindow target, Vector3 position)
     {
         return
             target.normalInvisible.TransformPoint(
                 sender.normalVisible.InverseTransformPoint(position));
     }
 
-    public static Quaternion TransformRotationBetweenPortals(Portal sender, Portal target, Quaternion rotation)
+    public static Quaternion TransformRotationBetweenPortals(PortalWindow sender, PortalWindow target, Quaternion rotation)
     {
         return
             target.normalInvisible.rotation *
@@ -78,7 +80,7 @@ public class Portal : MonoBehaviour
             catch (Exception e)
             {
                 // Catch exceptions so our loop doesn't die whenever there is an error
-                Debug.LogException(e);
+                // Debug.LogException(e);
             }
         }
     }
@@ -103,22 +105,42 @@ public class Portal : MonoBehaviour
 
             // Check if portalable object is behind the portal using Vector3.Dot (dot product)
             // If so, they have crossed through the portal.
-
+            
             var pivot = portalableObject.transform;
             var directionToPivotFromTransform = pivot.position - transform.position;
             directionToPivotFromTransform.Normalize();
             var pivotToNormalDotProduct = Vector3.Dot(directionToPivotFromTransform, normalVisible.forward);
-            if (pivotToNormalDotProduct > 0) continue;
+            // change to check if it is in front
+            if (pivotToNormalDotProduct < 0) continue;
 
             // Warp object
 
-            var newPosition = TransformPositionBetweenPortals(this, targetPortal, portalableObject.transform.position);
-            var newRotation = TransformRotationBetweenPortals(this, targetPortal, portalableObject.transform.rotation);
+
+            //var newPosition = TransformPositionBetweenPortals(this, targetPortal, portalableObject.transform.position);
+            var newPosition = targetPortal.normalInvisible.TransformPoint(this.normalVisible.InverseTransformPoint(portalableObject.transform.position));
+            //newPosition = targetPortal.transform.position + newPosition;
+
+            UnityEngine.Debug.Log("posicao objeto");
+            UnityEngine.Debug.Log(portalableObject.transform.position);
+            UnityEngine.Debug.Log("posicao relativa");
+            UnityEngine.Debug.Log(this.normalVisible.InverseTransformPoint(portalableObject.transform.position));
+            UnityEngine.Debug.Log(targetPortal.name);
             UnityEngine.Debug.Log(newPosition);
+            UnityEngine.Debug.Log("posicao portal outro");
             UnityEngine.Debug.Log(targetPortal.transform.position);
+
+            UnityEngine.Debug.Log("posicao final");
+            UnityEngine.Debug.Log(newPosition);
+            var newRotation = TransformRotationBetweenPortals(this, targetPortal, portalableObject.transform.rotation);
+            var cc = portalableObject.GetComponent<CharacterController>();
+            cc.enabled = false;
             portalableObject.transform.SetPositionAndRotation(newPosition, newRotation);
+            cc.enabled = true;
             portalableObject.OnHasTeleported(this, targetPortal, newPosition, newRotation);
 
+
+            UnityEngine.Debug.Log("objeto");
+            UnityEngine.Debug.Log(portalableObject.name);
             // Object is no longer touching this side of the portal
 
             objectsInPortalToRemove.Add(portalableObject);
@@ -158,8 +180,24 @@ public class Portal : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        var portalableObject = other.GetComponent<PortalableObject>();
-        if (portalableObject)
+        UnityEngine.Debug.Log("aya");
+        var portalableObject = other.transform.root.gameObject.GetComponent<PortalableObject>();
+        UnityEngine.Debug.Log(portalableObject.name);
+        var portalableViewObject = other.GetComponent<PortalableViewObject>();
+        if (portalableViewObject)
+        {
+            objectsInPortal.Add(portalableObject);
+        }
+    }
+
+    private void OnCollisionEnter(Collision cc)
+    {
+        Collider other = cc.collider;
+        UnityEngine.Debug.Log("aaa");
+        var portalableObject = other.transform.root.gameObject.GetComponent<PortalableObject>();
+        UnityEngine.Debug.Log(portalableObject.name);
+        var portalableViewObject = other.GetComponent<PortalableViewObject>();
+        if (portalableViewObject)
         {
             objectsInPortal.Add(portalableObject);
         }
@@ -167,8 +205,10 @@ public class Portal : MonoBehaviour
 
     private void OnTriggerExit(Collider other)
     {
-        var portalableObject = other.GetComponent<PortalableObject>();
-        if (portalableObject)
+        
+        var portalableObject = other.transform.root.gameObject.GetComponent<PortalableObject>();
+        var portalableViewObject = other.GetComponent<PortalableViewObject>();
+        if (portalableViewObject)
         {
             objectsInPortal.Remove(portalableObject);
         }
