@@ -111,6 +111,8 @@ public class PortalWindow : MonoBehaviour
             directionToPivotFromTransform.Normalize();
             var pivotToNormalDotProduct = Vector3.Dot(directionToPivotFromTransform, normalVisible.forward);
             // change to check if it is in front
+            UnityEngine.Debug.Log("pivoto");
+            UnityEngine.Debug.Log(pivotToNormalDotProduct);
             if (pivotToNormalDotProduct < 0) continue;
 
             // Warp object
